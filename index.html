@@ -1,0 +1,1105 @@
+<title>多米链上雷达办公室</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* 布局：顶部智能体状态条 > 三个一级来源卡片 > 办公室画布(蜘蛛抓数据送到中央 hub) > 新币榜 + 钱包追踪 > 二级主流/热门币 */
+:root{
+  --bg:#070b14; --panel:#0c1322; --panel2:#111c32; --line:#1b2742;
+  --fg:#dbe6ff; --muted:#7385ad;
+  --pump:#b6ff4d; --fomo:#ff5fa8; --gmgn:#5bc8ff;
+  --up:#2ee6a6; --down:#ff5c7a; --warn:#ffc14d; --violet:#a78bfa;
+  --font-d:'Chakra Petch','PingFang SC','Microsoft YaHei',system-ui,sans-serif;
+  --font-m:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-d);font-size:14px;line-height:1.45;
+  padding-block:20px 40px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+.wrap{max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.mono,.num{font-family:var(--font-m);font-variant-numeric:tabular-nums}
+header.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px}
+h1{margin:0;font-size:24px;font-weight:700;letter-spacing:.04em;text-wrap:balance}
+.brand{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+.tag{font-size:11px;letter-spacing:.08em;color:var(--warn);border:1px solid var(--warn);padding:2px 8px;border-radius:2px}
+.tag.live{color:var(--up);border-color:var(--up)}
+.sndbtn{appearance:none;background:var(--panel);border:1px solid var(--line);border-radius:6px;color:var(--fg);cursor:pointer;padding:6px 10px;font-size:12px;display:inline-flex;align-items:center;gap:6px;font-family:var(--font-d)}
+.sndbtn[aria-pressed="false"]{opacity:.5}
+.sndbtn svg{display:block}
+.conn{display:block;margin-top:6px;font-size:10px;color:var(--muted);font-family:var(--font-m);min-height:1.4em}
+.conn .ok{color:var(--up)} .conn .bad{color:var(--down)} .conn .wait{color:var(--warn)}
+.clock{font-family:var(--font-m);font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.label{font-size:11px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;margin:0 0 8px}
+
+.agents{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.ag{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;min-width:0;transition:border-color .2s,box-shadow .2s}
+.ag.talk{border-color:var(--c);box-shadow:0 0 18px color-mix(in srgb,var(--c) 30%,transparent)}
+.ag-top{display:flex;align-items:baseline;gap:8px}
+.ag-top b{font-size:13px;letter-spacing:.08em;color:var(--c)}
+.ag-top span{font-size:11px;color:var(--muted)}
+.ag p{margin:6px 0 8px;font-family:var(--font-m);font-size:11px;color:var(--fg);min-height:2.7em;overflow-wrap:anywhere}
+.meter{height:3px;background:var(--line);border-radius:2px;overflow:hidden}
+.meter span{display:block;height:100%;width:0;background:var(--c);transition:width .6s}
+
+.sources{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+button{font:inherit;color:inherit}
+.src{appearance:none;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;cursor:pointer;display:flex;flex-direction:column;gap:10px;transition:border-color .2s,box-shadow .2s,transform .2s;min-width:0}
+.src:hover{border-color:color-mix(in srgb,var(--c) 60%,var(--line))}
+.src[aria-pressed="true"]{border-color:var(--c);box-shadow:0 0 0 1px var(--c) inset,0 0 28px color-mix(in srgb,var(--c) 28%,transparent)}
+.src:focus-visible,.row:focus-visible,.toggle:focus-visible{outline:2px solid var(--c,var(--fg));outline-offset:2px}
+.src-top{display:flex;align-items:baseline;gap:10px}
+.src-top b{font-size:20px;letter-spacing:.1em;color:var(--c)}
+.src-top i{font-style:normal;font-size:12px;color:var(--muted)}
+.src-m{display:flex;gap:22px}
+.src-m div{display:flex;flex-direction:column}
+.src-m em{font-style:normal;font-family:var(--font-m);font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
+.src-m small{font-size:11px;color:var(--muted)}
+.src-spark svg{display:block;width:100%;height:34px}
+
+.stage{position:relative;border:1px solid var(--line);border-radius:8px;background:var(--panel);overflow:hidden}
+.stage-scroll{overflow-x:auto}
+.logp{position:absolute;top:12px;right:12px;z-index:2;width:min(290px,calc(100% - 24px));max-height:calc(100% - 24px);overflow:auto;background:var(--panel2);border:1px solid var(--c,var(--line));border-radius:8px;padding:12px 14px;box-shadow:0 10px 32px rgba(0,0,0,.55)}
+.logp h3{margin:0 0 10px;font-size:13px;letter-spacing:.04em;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.logp .x{appearance:none;background:none;border:1px solid var(--line);border-radius:3px;width:24px;height:24px;line-height:1;font-size:16px;color:var(--muted);cursor:pointer}
+.logp .x:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+.logp ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px;font-family:var(--font-m);font-size:11px}
+.logp li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px}
+.logp time{color:var(--muted)}
+.ag{cursor:pointer}
+.ag:focus-visible{outline:2px solid var(--c);outline-offset:2px}
+canvas{display:block;width:100%;min-width:720px;aspect-ratio:1200/640}
+
+.panes{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px}
+.pane{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;min-width:0}
+.pane-h{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;margin-bottom:6px}
+.pane-h h2{margin:0;font-size:15px;letter-spacing:.04em;display:flex;align-items:center;gap:8px}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+.hint{font-size:11px;color:var(--muted)}
+.row{appearance:none;display:grid;grid-template-columns:minmax(80px,1.3fr) .9fr .8fr 70px 44px 52px;gap:8px;align-items:center;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:9px 0;position:relative;cursor:pointer}
+.row:hover{background:color-mix(in srgb,var(--fg) 4%,transparent)}
+.row.head{cursor:default;font-size:11px;color:var(--muted);letter-spacing:.06em;padding:6px 0}
+.row.head:hover{background:none}
+.sym{display:flex;flex-direction:column;min-width:0}
+.sym b{font-size:14px;letter-spacing:.03em}
+.sym small{font-family:var(--font-m);font-size:10px;color:var(--muted)}
+.row .num{font-size:12px}
+.up{color:var(--up)} .dn{color:var(--down)} .wn{color:var(--warn)}
+.sf{font-size:11px;border:1px solid currentColor;border-radius:2px;padding:1px 0;text-align:center}
+.bar{position:absolute;left:0;bottom:-1px;height:2px;background:var(--c)}
+.row svg{display:block}
+.new{animation:flash 1.3s ease-out}
+@keyframes flash{from{background:color-mix(in srgb,var(--c,var(--fg)) 22%,transparent)}to{background:transparent}}
+.toggle{appearance:none;background:none;border:1px solid var(--line);border-radius:3px;padding:3px 10px;font-size:11px;color:var(--muted);cursor:pointer}
+.toggle[aria-pressed="true"]{color:var(--fg);border-color:var(--fg)}
+ul.feed{list-style:none;margin:0;padding:0}
+.ev{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:12px}
+.ev time{font-family:var(--font-m);font-size:10px;color:var(--muted)}
+.chip{font-size:10px;border:1px solid var(--line);border-radius:2px;padding:0 6px;color:var(--muted);white-space:nowrap}
+.ev code{font-family:var(--font-m);font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ev .what{font-family:var(--font-m);font-size:11px;text-align:right;white-space:nowrap}
+
+.second{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+.second h2{margin:0 0 10px;font-size:15px;letter-spacing:.04em}
+.grp{margin:12px 0 8px;font-size:11px;letter-spacing:.14em;color:var(--muted)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.tile{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:10px 12px;min-width:0}
+.tt{display:flex;justify-content:space-between;align-items:baseline;gap:6px}
+.tt b{font-size:13px;letter-spacing:.06em}
+.tt span{font-family:var(--font-m);font-size:11px}
+.px{font-family:var(--font-m);font-size:16px;font-weight:600;margin:4px 0 6px;font-variant-numeric:tabular-nums}
+.tile svg{display:block;width:100%;height:28px}
+footer{font-size:11px;color:var(--muted);line-height:1.6}
+
+@media (max-width:900px){.panes{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:560px){
+  .row{grid-template-columns:minmax(70px,1.3fr) 1fr .8fr 52px}
+  .row .sp,.row .sm{display:none}
+  h1{font-size:20px}
+}
+@media (prefers-reduced-motion:reduce){.new{animation:none}.ag,.src,.meter span{transition:none}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><h1>多米链上雷达办公室</h1><span class="tag live" id="livetag">实时数据</span></div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="sndbtn" id="sndbtn" aria-pressed="true" aria-label="音效开关"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z" fill="currentColor" stroke="none"/><path class="wv" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="wv" d="M18.5 5.5a9.4 9.4 0 0 1 0 13"/></svg><span id="sndtxt">音效开</span></button>
+      <div class="clock" id="clock">00:00:00 UTC</div>
+    </div>
+  </header>
+
+  <section>
+    <p class="label">智能体</p>
+    <div class="agents" id="agents"></div>
+  </section>
+
+  <section>
+    <p class="label">一级 · 选择来源</p>
+    <div class="sources" id="sources"></div>
+  </section>
+
+  <section class="stage">
+    <aside class="logp" id="logp" hidden></aside>
+    <div class="stage-scroll"><canvas id="office" role="img" aria-label="智能体办公室动画：蜘蛛从各数据源抓取数据送到中央 hub，智能体在工位间走动"></canvas></div>
+  </section>
+
+  <section class="panes">
+    <div class="pane" id="tokPane">
+      <div class="pane-h" id="tokHead"></div>
+      <div id="tokBody"></div>
+    </div>
+    <div class="pane">
+      <div class="pane-h">
+        <h2>热点钱包追踪</h2>
+        <button class="toggle" id="feedToggle" aria-pressed="false">只看当前来源</button>
+      </div>
+      <ul class="feed" id="feed"></ul>
+    </div>
+  </section>
+
+  <section class="second">
+    <h2>二级 · 主流币与热门币</h2>
+    <p class="grp">主流币</p>
+    <div class="tiles" id="mainCoins"></div>
+    <p class="grp">热门币</p>
+    <div class="tiles" id="hotCoins"></div>
+  </section>
+
+  <footer>实时数据：PUMP 新币与毕业经 PumpPortal WebSocket 实时推送；FOMO 热度榜来自 DexScreener（Boost / 最新上币）；GMGN 聪明钱榜来自 GMGN 前端接口（经代理，代理不可用时降级显示 DexScreener Solana 新币）；主流币与热门币价格来自 CoinGecko，60 秒刷新；BTC/ETH 大单与巨鲸成交来自 Coinbase 实时成交流。音效由 Web Audio 实时合成。仅供监控演示，不构成投资建议。</footer>
+</div>
+
+<script>
+(function(){
+'use strict';
+var rs=getComputedStyle(document.documentElement);
+function tok(n){return rs.getPropertyValue(n).trim();}
+var COL={bg:tok('--bg'),panel:tok('--panel'),panel2:tok('--panel2'),line:tok('--line'),fg:tok('--fg'),muted:tok('--muted'),
+  up:tok('--up'),down:tok('--down'),warn:tok('--warn'),pump:tok('--pump'),fomo:tok('--fomo'),gmgn:tok('--gmgn'),violet:tok('--violet')};
+var RM=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+var SPEED=RM?0.35:1;
+var TAU=Math.PI*2;
+var SIM=false; // 本版恒为实时数据
+
+/* ---------- 工具 ---------- */
+function rnd(a,b){return a+Math.random()*(b-a);}
+function pick(a){return a[Math.floor(Math.random()*a.length)];}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function $(id){return document.getElementById(id);}
+var B58='123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+function b58(n){var s='';for(var i=0;i<n;i++)s+=B58[Math.floor(Math.random()*B58.length)];return s;}
+function addr(){return b58(4)+'…'+b58(4);}
+function fmtUsd(n){if(n>=1e6)return '$'+(n/1e6).toFixed(2)+'M';if(n>=1e3)return '$'+(n/1e3).toFixed(1)+'K';return '$'+n.toFixed(0);}
+function fmtAge(ms){var s=Math.max(0,Math.floor(ms/1000));if(s<60)return s+'s';if(s<3600)return Math.floor(s/60)+'m';return Math.floor(s/3600)+'h';}
+function fmtPrice(p){if(p>=1000)return p.toLocaleString('en-US',{maximumFractionDigits:0});if(p>=1)return p.toFixed(2);if(p>=0.001)return p.toFixed(4);return p.toFixed(8);}
+function alpha(c,a){var n=parseInt(c.slice(1),16);return 'rgba('+(n>>16&255)+','+(n>>8&255)+','+(n&255)+','+a+')';}
+function hh(ts){var d=new Date(ts);return ('0'+d.getUTCHours()).slice(-2)+':'+('0'+d.getUTCMinutes()).slice(-2)+':'+('0'+d.getUTCSeconds()).slice(-2);}
+
+/* ---------- 音效：Web Audio 纯合成，无外部音频文件 ---------- */
+var Sfx={ctx:null,on:true,lastTalk:0,
+ ensure:function(){if(this.ctx)return true;try{this.ctx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){return false;}return true;},
+ resume:function(){if(this.ensure()&&this.ctx.state==='suspended'){this.ctx.resume();}},
+ tone:function(f,dur,type,vol,delay,slideTo){
+  if(!this.on||!this.ensure())return;
+  try{
+   var c=this.ctx,t=c.currentTime+(delay||0);
+   var o=c.createOscillator(),g=c.createGain();
+   o.type=type||'sine';o.frequency.setValueAtTime(f,t);
+   if(slideTo)o.frequency.exponentialRampToValueAtTime(slideTo,t+dur);
+   g.gain.setValueAtTime(0.0001,t);
+   g.gain.exponentialRampToValueAtTime(vol||0.06,t+0.012);
+   g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+   o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+dur+0.05);
+  }catch(e){}},
+ grab:function(){this.tone(1250,0.06,'square',0.025);},                       // 蜘蛛抓到数据包
+ deliver:function(){this.tone(660,0.09,'sine',0.05);this.tone(880,0.12,'sine',0.05,0.08);}, // 送达 HUB
+ buy:function(){this.tone(520,0.1,'sine',0.06,0,820);},                       // 钱包买入上扬
+ sell:function(){this.tone(740,0.1,'sine',0.06,0,380);},                       // 钱包卖出下坠
+ fail:function(){this.tone(160,0.18,'sawtooth',0.045,0,110);},                 // 抓取失败
+ grad:function(){var s=this;[523,659,784,1046].forEach(function(f,i){s.tone(f,0.14,'triangle',0.06,i*0.09);});}, // 毕业琶音
+ fireworks:function(){ // 大买单：升空哨 + 炸开
+  if(!this.on||!this.ensure())return;var s=this,i;
+  s.tone(500,0.28,'sine',0.035,0,1900);
+  for(i=0;i<12;i++){s.tone(1600+Math.random()*2800,0.1+Math.random()*0.16,'triangle',0.032,0.3+Math.random()*0.3);}
+  s.tone(320,0.32,'sine',0.05,0.3,80);
+ },
+ explosion:function(){ // 大卖单：低频下坠 + 噪声轰
+  if(!this.on||!this.ensure())return;
+  try{
+   var c=this.ctx,t=c.currentTime;
+   var o=c.createOscillator(),g=c.createGain();
+   o.type='sine';o.frequency.setValueAtTime(130,t);
+   o.frequency.exponentialRampToValueAtTime(26,t+0.65);
+   g.gain.setValueAtTime(0.24,t);g.gain.exponentialRampToValueAtTime(0.0001,t+0.75);
+   o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+0.8);
+   var len=Math.floor(c.sampleRate*0.5),buf=c.createBuffer(1,len,c.sampleRate),ch=buf.getChannelData(0);
+   for(var i=0;i<len;i++)ch[i]=(Math.random()*2-1)*(1-i/len);
+   var n=c.createBufferSource();n.buffer=buf;
+   var f=c.createBiquadFilter();f.type='lowpass';f.frequency.value=300;
+   var g2=c.createGain();g2.gain.setValueAtTime(0.32,t);g2.gain.exponentialRampToValueAtTime(0.0001,t+0.55);
+   n.connect(f);f.connect(g2);g2.connect(c.destination);n.start(t);
+  }catch(e){}},
+ talk:function(){var n=Date.now();if(n-this.lastTalk<2500)return;this.lastTalk=n;this.tone(440,0.05,'sine',0.02);} // 智能体说话（节流）
+};
+document.addEventListener('pointerdown',function(){Sfx.resume();},{passive:true});
+
+function spark(arr,w,h,color,stretch){
+  if(!arr||arr.length<2)return '<svg viewBox="0 0 '+w+' '+h+'" aria-hidden="true"><path d="M0 '+(h/2).toFixed(1)+'L'+w+' '+(h/2).toFixed(1)+'" fill="none" stroke="'+color+'" stroke-width="1.5" opacity=".35"/></svg>';
+  var mn=Math.min.apply(null,arr),mx=Math.max.apply(null,arr),rg=(mx-mn)||1;
+  var pts=arr.map(function(v,i){return [i/(arr.length-1)*w,h-3-(v-mn)/rg*(h-6)];});
+  var d=pts.map(function(p,i){return (i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1);}).join('');
+  var l=pts[pts.length-1];
+  var ve=stretch?' vector-effect="non-scaling-stroke"':'';
+  return '<svg viewBox="0 0 '+w+' '+h+'" '+(stretch?'preserveAspectRatio="none"':'width="'+w+'" height="'+h+'"')+' aria-hidden="true">'+
+    '<path d="'+d+'L'+w+' '+h+'L0 '+h+'Z" fill="'+color+'" fill-opacity=".13"/>'+
+    '<path d="'+d+'" fill="none" stroke="'+color+'" stroke-width="1.5" stroke-linejoin="round"'+ve+'/>'+
+    (stretch?'':'<circle cx="'+l[0].toFixed(1)+'" cy="'+l[1].toFixed(1)+'" r="2.2" fill="'+color+'"/>')+'</svg>';
+}
+
+/* ---------- 来源与数据 ---------- */
+var SRC={
+  pump:{key:'pump',name:'PUMP',zh:'pump.fun 发射台',color:COL.pump,desk:{x:250,y:400},seat:{x:250,y:462}},
+  fomo:{key:'fomo',name:'FOMO',zh:'Fomo 热点',color:COL.fomo,desk:{x:600,y:408},seat:{x:600,y:470}},
+  gmgn:{key:'gmgn',name:'GMGN',zh:'GMGN 聪明钱',color:COL.gmgn,desk:{x:950,y:400},seat:{x:950,y:462}}
+};
+var KEYS=['pump','fomo','gmgn'];
+var sel='pump',feedAll=false,uid=0;
+var tokens={pump:[],fomo:[],gmgn:[]};
+var rate={pump:{v:0,h:[]},fomo:{v:0,h:[]},gmgn:{v:0,h:[]}};
+var stats={alerts:0,packets:0,fails:0};
+var events=[];
+
+/* ---------- 实时数据源（无模拟，全部真实接口） ---------- */
+var SOL_USD=108;
+function shortMint(m){return m?String(m).slice(0,4)+'…'+String(m).slice(-4):'—';}
+function chg5(t){var h=t.hist;if(!h||h.length<6||!h[h.length-6])return null;return (h[h.length-1]/h[h.length-6]-1)*100;}
+function setConn(k,html){var el=$('conn-'+k);if(el)el.innerHTML=html;}
+function dexJson(url){return fetch(url).then(function(r){if(!r.ok)throw new Error('http '+r.status);return r.json();});}
+KEYS.forEach(function(k){for(var j=0;j<30;j++)rate[k].h.push(0);});
+
+/* --- PUMP: PumpPortal WebSocket 实时新币 + 毕业 --- */
+var pumpNewTs=[];
+function pumpNewToken(d){
+  var mcapSol=d.marketCapSol||0;
+  var t={id:++uid,sym:String(d.symbol||'???').slice(0,10),src:'pump',mint:d.mint,
+    born:Date.now(),mcap:mcapSol*SOL_USD,hist:[],liq:null,
+    bond:clamp((d.vSolInBondingCurve||0)/85*100,0,100),fresh:true,chain:'solana',
+    trader:d.traderPublicKey||'',sig:d.signature||''};
+  for(var i=0;i<32;i++)t.hist.push(t.mcap);
+  var list=tokens.pump;list.unshift(t);if(list.length>12)list.pop();
+  pumpNewTs.push(Date.now());
+  ping('pump');flashCard('SCAN');
+  say(agent('SCAN'),'PUMP 新币 '+t.sym);
+  if(sel==='pump')renderTokens();
+  dexWatch(t);
+}
+function pumpMigrate(d){
+  var list=tokens.pump,found=null;
+  for(var i=0;i<list.length;i++)if(list[i].mint===d.mint){found=list[i];list.splice(i,1);break;}
+  if(found){graduate(found);}
+  else{
+    pushEvent({src:'pump',sym:String(d.symbol||shortMint(d.mint)).slice(0,10),kind:'毕业',addr:'',act:'buy',usd:0,note:'毕业 → DEX'});
+    say(agent('CHIEF'),'PUMP 有币毕业，转二级');
+  }
+  if(sel==='pump')renderTokens();
+}
+var PumpWS={ws:null,retry:0,
+ connect:function(){
+  var self=this;
+  setConn('pump','<span class="wait">连接中…</span>');
+  try{self.ws=new WebSocket('wss://pumpportal.fun/api/data');}
+  catch(e){self.reconnect();return;}
+  self.ws.onopen=function(){self.retry=0;
+    try{
+      self.ws.send(JSON.stringify({method:'subscribeNewToken'}));
+      self.ws.send(JSON.stringify({method:'subscribeMigration'}));
+    }catch(e){}
+    setConn('pump','<span class="ok">● 实时推送</span>');};
+  self.ws.onmessage=function(ev){var d;try{d=JSON.parse(ev.data);}catch(e){return;}
+    if(d.message)return;
+    if(d.mint&&d.txType==='create')pumpNewToken(d);
+    else if(d.mint)pumpMigrate(d);};
+  self.ws.onclose=function(){setConn('pump','<span class="bad">重连中…</span>');self.reconnect();};
+  self.ws.onerror=function(){try{self.ws.close();}catch(e){}};
+ },
+ reconnect:function(){var self=this;self.retry++;
+  setTimeout(function(){self.connect();},Math.min(30000,1500*Math.pow(1.6,self.retry)));}
+};
+
+/* --- DexScreener: token 详情补全（价格/流动性/走势） --- */
+var dexWatched={};
+function dexWatch(t){if(t.mint)dexWatched[t.mint]=t;}
+function dexFillToken(t,done){
+  dexJson('https://api.dexscreener.com/latest/dex/tokens/'+t.mint).then(function(j){
+    var p=(j.pairs||[])[0];if(!p)return;
+    var bs=p.baseToken||{};
+    if(bs.symbol)t.sym=String(bs.symbol).slice(0,10);
+    t.mcap=p.fdv||p.marketCap||t.mcap;
+    t.liq=p.liquidity?p.liquidity.usd:null;
+    if(t.chain==='fomo'&&p.chainId)t.chain=p.chainId;
+    t.hist.push(t.mcap);if(t.hist.length>48)t.hist.shift();
+    t.fresh=false;
+    if(t.src===sel)renderTokens();
+    if(done)done();
+  }).catch(function(){});
+}
+function dexPollTokens(){
+  var alive={};
+  KEYS.forEach(function(k){tokens[k].forEach(function(t){if(t.mint)alive[t.mint]=1;});});
+  Object.keys(dexWatched).forEach(function(m){if(!alive[m])delete dexWatched[m];});
+  var ms=Object.keys(dexWatched).slice(-18);
+  ms.forEach(function(m,i){
+    setTimeout(function(){var t=dexWatched[m];if(t)dexFillToken(t);},i*800);
+  });
+}
+
+/* --- FOMO: DexScreener Boost 热度榜 + 最新上币 --- */
+function fomoPoll(){
+  dexJson('https://api.dexscreener.com/token-boosts/top/v1').then(function(arr){
+    if(!arr||!arr.length)return;
+    var list=tokens.fomo;list.length=0;
+    arr.slice(0,10).forEach(function(b,i){
+      var t={id:++uid,sym:'???',src:'fomo',mint:b.tokenAddress,born:Date.now()-i*45000,
+        mcap:0,hist:[],liq:null,bond:0,fresh:true,chain:b.chainId||'',
+        desc:b.description||''};
+      list.push(t);dexWatch(t);
+      setTimeout(function(){dexFillToken(t);},i*700);
+    });
+    rate.fomo.v=arr.length;
+    rate.fomo.h.push(arr.length);rate.fomo.h.shift();
+    setConn('fomo','<span class="ok">● 1分钟前</span>');
+    if(sel==='fomo')renderTokens();updateSourceCards();
+  }).catch(function(){setConn('fomo','<span class="bad">更新失败</span>');});
+}
+
+/* --- GMGN: 聪明钱钱包榜（前端接口经代理；代理不可用时降级为 DexScreener Solana 新币） --- */
+var gmgnMode='smart',gmgnTries=0;
+function gmgnPoll(){gmgnTries=0;gmgnViaProxy();}
+function gmgnViaProxy(){
+  var url='https://gmgn.ai/defi/quotation/v1/rank/sol/wallets/1d?tag=smart_degen&orderby=pnl_1d&direction=desc';
+  fetch('https://api.allorigins.win/raw?url='+encodeURIComponent(url)+'&_='+Date.now())
+   .then(function(r){if(!r.ok)throw new Error('http '+r.status);return r.json();})
+   .then(function(j){
+     var rank=((j.data||{}).rank||[]).slice(0,10);
+     if(!rank.length)throw new Error('empty');
+     gmgnMode='smart';
+     tokens.gmgn.length=0;
+     rank.forEach(function(w){
+       tokens.gmgn.push({id:++uid,src:'gmgn',wallet:w.address,tag:w.walletTag||'聪明钱',
+         pnl1d:+(w.pnl_1d||w.pnl||0),winrate:(w.winrate_1d!=null?w.winrate_1d:w.win_rate),
+         buy1d:+(w.buy_1d||w.buy||0),sell1d:+(w.sell_1d||w.sell||0),fresh:true});
+     });
+     rate.gmgn.h.push(rank.length);rate.gmgn.h.shift();
+     setConn('gmgn','<span class="ok">● 聪明钱·2分钟前</span>');
+     rank.slice(0,3).forEach(function(w,i){
+       setTimeout(function(){
+         pushEvent({src:'gmgn',sym:'SMART',kind:'聪明钱',addr:shortMint(w.address),act:'buy',
+           usd:Math.abs(+(w.pnl_1d||w.pnl||0)),note:'聪明钱上榜·1d收益'});
+       },i*1000);
+     });
+     if(sel==='gmgn')renderTokens();updateSourceCards();
+   })
+   .catch(function(){
+     gmgnTries++;
+     if(gmgnTries<2){setTimeout(gmgnViaProxy,4000);return;}
+     gmgnFallback();
+   });
+}
+function gmgnFallback(){
+  dexJson('https://api.dexscreener.com/token-profiles/latest/v1').then(function(arr){
+    var list=(arr||[]).filter(function(b){return b.chainId==='solana';}).slice(0,10);
+    if(!list.length)throw new Error('empty');
+    gmgnMode='fallback';
+    tokens.gmgn.length=0;
+    list.forEach(function(b,i){
+      var t={id:++uid,sym:'???',src:'gmgn',mint:b.tokenAddress,born:Date.now()-i*60000,
+        mcap:0,hist:[],liq:null,bond:0,fresh:true,chain:'solana',desc:b.description||'',fallback:true};
+      tokens.gmgn.push(t);dexWatch(t);
+      setTimeout(function(){dexFillToken(t);},i*700);
+    });
+    setConn('gmgn','<span class="wait">降级·DexScreener Solana新币</span>');
+    if(sel==='gmgn')renderTokens();updateSourceCards();
+  }).catch(function(){setConn('gmgn','<span class="bad">暂无数据</span>');});
+}
+
+/* --- 主流币 + 热门币: CoinGecko 批量 --- */
+var CG_IDS='bitcoin,ethereum,solana,binancecoin,ripple,dogecoin,pepe,dogwifcoin,bonk,official-trump';
+var CG_MAP={bitcoin:'BTC',ethereum:'ETH',solana:'SOL',binancecoin:'BNB',ripple:'XRP',dogecoin:'DOGE',pepe:'PEPE',dogwifcoin:'WIF',bonk:'BONK','official-trump':'TRUMP'};
+function cgPoll(){
+  dexJson('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids='+CG_IDS+'&price_change_percentage=24h&sparkline=true')
+   .then(function(arr){
+     arr.forEach(function(c){
+       var sym=CG_MAP[c.id];if(!sym)return;
+       var t=null;for(var i=0;i<COINS.length;i++)if(COINS[i].sym===sym)t=COINS[i];
+       if(!t)return;
+       t.p=c.current_price;t.chg=c.price_change_percentage_24h||0;
+       var sp=(c.sparkline_in_7d&&c.sparkline_in_7d.price)||[];
+       t.hist=sp.filter(function(_,i){return i%4===0;});
+       if(sym==='SOL')SOL_USD=c.current_price;
+     });
+     renderCoins();updateAgentCards();
+   }).catch(function(){});
+}
+
+var COINS=[
+  {sym:'BTC',g:'main',p:0,chg:0,hist:[]},{sym:'ETH',g:'main',p:0,chg:0,hist:[]},
+  {sym:'SOL',g:'main',p:0,chg:0,hist:[]},{sym:'BNB',g:'main',p:0,chg:0,hist:[]},
+  {sym:'XRP',g:'main',p:0,chg:0,hist:[]},
+  {sym:'DOGE',g:'hot',p:0,chg:0,hist:[]},{sym:'PEPE',g:'hot',p:0,chg:0,hist:[]},
+  {sym:'WIF',g:'hot',p:0,chg:0,hist:[]},{sym:'BONK',g:'hot',p:0,chg:0,hist:[]},
+  {sym:'TRUMP',g:'hot',p:0,chg:0,hist:[]}
+];
+
+/* ---------- 鲸鱼大单：Coinbase 实时成交（WS 主，REST 兜底） ---------- */
+var WHALE={BTC:{buys:0,sells:0,max:0},ETH:{buys:0,sells:0,max:0}};
+function coin(sym){for(var i=0;i<COINS.length;i++)if(COINS[i].sym===sym)return COINS[i];return {p:0,chg:0};}
+function whaleTrade(sym,side,usd,price){
+  if(!(usd>0))return;
+  var big=sym==='BTC'?100000:50000, huge=sym==='BTC'?500000:250000;
+  if(usd<big)return;
+  var W=WHALE[sym];if(!W)return;
+  if(side==='b'){W.buys++;}else{W.sells++;}
+  if(usd>W.max)W.max=usd;
+  var k=sym+'W';
+  flashCard(k);
+  if(side==='b'){Sfx.fireworks();burstFW();}else{Sfx.explosion();burstEX();}
+  if(usd>=huge){say(agent(k),sym+' 巨鲸'+(side==='b'?'大买 ':'大卖 ')+fmtUsd(usd));}
+  updateWhaleCards();
+}
+function whaleCardTxt(sym){var W=WHALE[sym],c=coin(sym);
+  var p=c.p?fmtUsd(c.p):'—';
+  var chg=c.chg?(c.chg>=0?'▲':'▼')+Math.abs(c.chg).toFixed(1)+'%':'';
+  return (p+' '+chg+' 大买'+W.buys+' 大卖'+W.sells).replace(/ +/g,' ').trim();}
+function whaleMeter(sym){var W=WHALE[sym],t=W.buys+W.sells;return t?W.buys/t:0;}
+function updateWhaleCards(){
+  if(!$('ags-BTCW'))return;
+  $('ags-BTCW').textContent=whaleCardTxt('BTC');$('agm-BTCW').style.width=Math.round(whaleMeter('BTC')*100)+'%';
+  $('ags-ETHW').textContent=whaleCardTxt('ETH');$('agm-ETHW').style.width=Math.round(whaleMeter('ETH')*100)+'%';
+}
+var WhaleWS={ws:null,retry:0,fails:0,
+ connect:function(){
+  var self=this;
+  try{self.ws=new WebSocket('wss://ws-feed.exchange.coinbase.com');}
+  catch(e){self.rest();return;}
+  self.ws.onopen=function(){self.retry=0;self.fails=0;
+    try{self.ws.send(JSON.stringify({type:'subscribe',channels:[{name:'matches',product_ids:['BTC-USD','ETH-USD']}] }));}catch(e){}};
+  self.ws.onmessage=function(ev){var d;try{d=JSON.parse(ev.data);}catch(e){return;}
+    if((d.type==='match'||d.type==='last_match')&&d.product_id){
+      var sym=d.product_id==='BTC-USD'?'BTC':(d.product_id==='ETH-USD'?'ETH':null);
+      if(sym)whaleTrade(sym,d.side,parseFloat(d.size)*parseFloat(d.price),parseFloat(d.price));
+    }};
+  self.ws.onclose=function(){self.fails++;if(self.fails>=3){self.rest();return;}self.reconnect();};
+  self.ws.onerror=function(){try{self.ws.close();}catch(e){}};
+ },
+ reconnect:function(){var self=this;self.retry++;
+  setTimeout(function(){self.connect();},Math.min(30000,1500*Math.pow(1.6,self.retry)));},
+ rest:function(){
+  var self=this;
+  if(self._rest)return;self._rest=true;
+  function poll(){
+    [['BTC','BTC-USD'],['ETH','ETH-USD']].forEach(function(pr){
+      fetch('https://api.exchange.coinbase.com/products/'+pr[1]+'/trades?limit=60')
+       .then(function(r){return r.json();}).then(function(arr){
+         if(!arr||!arr.length)return;
+         var sym=pr[0],mx=0;
+         arr.forEach(function(t){if(t.trade_id>mx)mx=t.trade_id;});
+         if(!whaleLastId[sym]){whaleLastId[sym]=mx;return;}
+         arr.forEach(function(t){
+           if(t.trade_id>whaleLastId[sym])whaleTrade(sym,t.side,parseFloat(t.size)*parseFloat(t.price),parseFloat(t.price));
+         });
+         whaleLastId[sym]=mx;
+       }).catch(function(){});
+    });
+  }
+  poll();setInterval(poll,15000);
+ }
+};
+var whaleLastId={};
+
+/* ---------- 智能体 ---------- */
+var AG=[
+  {k:'CHIEF',zh:'总指挥',color:COL.fg,home:{x:600,y:330}},
+  {k:'SCAN',zh:'扫描',color:COL.gmgn,home:{x:250,y:462}},
+  {k:'VET',zh:'审查',color:COL.down,home:{x:600,y:470}},
+  {k:'WALLET',zh:'钱包追踪',color:COL.up,home:{x:950,y:462}},
+  {k:'QUANT',zh:'量化',color:COL.violet,home:{x:420,y:330}},
+  {k:'SIZE',zh:'仓位',color:COL.fomo,home:{x:780,y:330}},
+  {k:'RISK',zh:'风控',color:COL.warn,home:{x:420,y:520}},
+  {k:'CRAWLER',zh:'蜘蛛长',color:COL.pump,home:{x:160,y:225}},
+  {k:'BTCW',zh:'BTC 鲸眼',color:'#f7931a',home:{x:250,y:330}},
+  {k:'ETHW',zh:'ETH 鲸眼',color:'#627eea',home:{x:950,y:330}}
+];
+$('agents').innerHTML=AG.map(function(a){
+  return '<div class="ag" id="ag-'+a.k+'" style="--c:'+a.color+'"><div class="ag-top"><b>'+a.k+'</b><span>'+a.zh+'</span></div>'+
+    '<p id="ags-'+a.k+'">待命</p><div class="meter"><span id="agm-'+a.k+'"></span></div></div>';}).join('');
+$('sources').innerHTML=KEYS.map(function(k){var s=SRC[k];
+  return '<button class="src" data-src="'+k+'" aria-pressed="'+(k===sel)+'" style="--c:'+s.color+'">'+
+    '<span class="src-top"><b>'+s.name+'</b><i>'+s.zh+'</i></span>'+
+    '<span class="src-m"><div><em id="mn-'+k+'">0</em><small>新币/分钟</small></div><div><em id="ms-'+k+'">0</em><small>跟踪中</small></div></span>'+
+    '<span class="src-spark" id="sp-'+k+'"></span><span class="conn" id="conn-'+k+'"><span class="wait">待连接</span></span></button>';}).join('');
+
+var qm=0.5,dd=3.2;
+function updateAgentCards(){
+  var s=SRC[sel],list=tokens[sel];
+  function set(k,txt,m){$('ags-'+k).textContent=txt;$('agm-'+k).style.width=Math.round(clamp(m,0,1)*100)+'%';}
+  dd=clamp(dd+rnd(-.4,.4),1,9);
+  var out=spiders.filter(function(x){return x.state!=='nest';}).length;
+  if(sel==='gmgn'){
+    if(gmgnMode==='smart'){
+      set('CHIEF','盯 GMGN，聪明钱 '+list.length+' 个',list.length/10);
+      set('SCAN','钱包榜轮询中',0.5);
+    }else{
+      set('CHIEF','盯 GMGN(降级)，跟踪 '+list.length+' 个',list.length/12);
+      set('SCAN','榜单轮询中',0.5);
+    }
+    set('VET','—',0);
+  }else{
+    var liqOk=list.filter(function(t){return (t.liq||0)>=20000;}).length;
+    var cs=list.map(chg5).filter(function(c){return c!==null;});
+    var avg=cs.length?cs.reduce(function(a,c){return a+c;},0)/cs.length:0;
+    qm+=(clamp(.5+avg/20,0,1)-qm)*.3;
+    set('CHIEF','盯 '+s.name+'，跟踪 '+list.length+' 个',list.length/12);
+    set('SCAN',sel==='pump'?Math.round(rate.pump.v)+' 个新币/分钟':'榜单轮询中',sel==='pump'?rate.pump.v/30:0.5);
+    set('VET','流动性>2万 '+liqOk+' 个',liqOk/(list.length||1));
+  }
+  set('WALLET','动态 '+events.length+' 条，提醒 '+stats.alerts,(stats.alerts%20)/20);
+  set('QUANT','动量评分 '+qm.toFixed(2),qm);
+  set('SIZE','单笔上限 '+fmtUsd(1200+qm*2000),qm);
+  set('RISK','回撤 -'+dd.toFixed(1)+'% / 限 -12%',dd/12);
+  set('CRAWLER',out+'/'+spiders.length+' 只在外，失败 '+stats.fails,out/spiders.length);
+  set('BTCW',whaleCardTxt('BTC'),whaleMeter('BTC'));
+  set('ETHW',whaleCardTxt('ETH'),whaleMeter('ETH'));
+}
+function flashCard(k){var el=$('ag-'+k);if(!el)return;el.classList.add('talk');clearTimeout(el._t);el._t=setTimeout(function(){el.classList.remove('talk');},2800);}
+
+/* ---------- 渲染：来源卡片 / 新币榜 / 钱包 / 二级 ---------- */
+function updateSourceCards(){
+  KEYS.forEach(function(k){
+    $('mn-'+k).textContent=Math.round(rate[k].v);
+    $('ms-'+k).textContent=tokens[k].length;
+    $('sp-'+k).innerHTML=spark(rate[k].h,220,34,SRC[k].color,true);
+  });
+}
+function renderTokens(){
+  var s=SRC[sel];
+  $('tokPane').style.setProperty('--c',s.color);
+  if(sel==='gmgn'){renderGmgnWallets();return;}
+  $('tokHead').innerHTML='<h2><span class="dot" style="background:'+s.color+'"></span>一级 · '+s.name+(sel==='pump'?' 新币':' 热度榜')+'</h2>'+
+    '<span class="hint">'+(sel==='pump'?'点一行，派蜘蛛去审查 · PumpPortal 实时':'数据来自 DexScreener')+'</span>';
+  var head='<div class="row head"><span>币</span><span>市值</span><span>5 分钟</span><span class="sp">走势</span><span class="sm">流动性</span><span>'+(sel==='pump'?'Bond':'链')+'</span></div>';
+  var list=tokens[sel];
+  $('tokBody').innerHTML=head+(list.length?list.map(function(t){
+    var c=chg5(t),cCls=c===null?'':(c>=0?'up':'dn');
+    var cTxt=c===null?'—':(c>=0?'▲':'▼')+Math.abs(c).toFixed(1)+'%';
+    var liq=t.liq==null?'—':fmtUsd(t.liq);
+    var sub=fmtAge(Date.now()-t.born)+(t.mint?' · '+shortMint(t.mint):'');
+    var spHtml=t.hist.length>4?spark(t.hist,64,22,c===null?COL.muted:(c>=0?COL.up:COL.down)):'<span class="hint">—</span>';
+    return '<button class="row'+(t.fresh?' new':'')+'" data-id="'+t.id+'">'+
+      '<span class="sym"><b>'+t.sym+'</b><small>'+sub+'</small></span>'+
+      '<span class="num">'+(t.mcap?fmtUsd(t.mcap):'—')+'</span>'+
+      '<span class="num '+cCls+'">'+cTxt+'</span>'+
+      '<span class="sp">'+spHtml+'</span>'+
+      '<span class="num sm">'+liq+'</span>'+
+      (sel==='pump'
+        ?'<span class="num">'+t.bond.toFixed(0)+'%</span><span class="bar" style="width:'+t.bond.toFixed(0)+'%"></span>'
+        :'<span class="num sm">'+(t.chain||'—')+'</span>')+'</button>';
+  }).join(''):'<div class="hint" style="padding:18px 0">正在连接实时数据源…</div>');
+}
+function renderGmgnWallets(){
+  var s=SRC.gmgn,list=tokens.gmgn;
+  if(gmgnMode==='fallback'||(list.length&&!list[0].wallet)){renderGmgnFallback(list,s);return;}
+  $('tokHead').innerHTML='<h2><span class="dot" style="background:'+s.color+'"></span>GMGN · 聪明钱钱包榜（1d）</h2>'+
+    '<span class="hint">GMGN 前端接口 · 经代理抓取 · 2 分钟刷新</span>';
+  $('tokBody').innerHTML=renderGmgnWalletsSmart(list);
+}
+function renderGmgnFallback(list,s){
+  $('tokHead').innerHTML='<h2><span class="dot" style="background:'+s.color+'"></span>GMGN · Solana 最新上币</h2>'+
+    '<span class="hint">GMGN 接口暂不可用，降级显示 DexScreener 数据</span>';
+  var head='<div class="row head"><span>币</span><span>市值</span><span>5 分钟</span><span class="sp">走势</span><span class="sm">流动性</span><span>链</span></div>';
+  $('tokBody').innerHTML=head+(list.length?list.map(function(t){
+    var c=chg5(t),cCls=c===null?'':(c>=0?'up':'dn');
+    var cTxt=c===null?'—':(c>=0?'▲':'▼')+Math.abs(c).toFixed(1)+'%';
+    var spHtml=t.hist.length>4?spark(t.hist,64,22,c===null?COL.muted:(c>=0?COL.up:COL.down)):'<span class="hint">—</span>';
+    return '<button class="row'+(t.fresh?' new':'')+'" data-id="'+t.id+'">'+
+      '<span class="sym"><b>'+t.sym+'</b><small>'+fmtAge(Date.now()-t.born)+(t.mint?' · '+shortMint(t.mint):'')+'</small></span>'+
+      '<span class="num">'+(t.mcap?fmtUsd(t.mcap):'—')+'</span>'+
+      '<span class="num '+cCls+'">'+cTxt+'</span>'+
+      '<span class="sp">'+spHtml+'</span>'+
+      '<span class="num sm">'+(t.liq==null?'—':fmtUsd(t.liq))+'</span>'+
+      '<span class="num sm">'+(t.chain||'—')+'</span></button>';
+  }).join(''):'<div class="hint" style="padding:18px 0">正在抓取数据…</div>');
+}
+function renderGmgnWalletsSmart(list){
+  var head='<div class="row head"><span>钱包</span><span>标签</span><span>1d 收益</span><span class="sp">买/卖</span><span class="sm">胜率</span><span></span></div>';
+  return head+(list.length?list.map(function(w){
+    var up=w.pnl1d>=0;
+    var wr=w.winrate==null?'—':(w.winrate>1?w.winrate:w.winrate*100).toFixed(0)+'%';
+    return '<div class="row" style="cursor:default">'+
+      '<span class="sym"><b class="mono">'+shortMint(w.wallet)+'</b><small class="mono">'+String(w.wallet).slice(0,16)+'…</small></span>'+
+      '<span class="num">'+w.tag+'</span>'+
+      '<span class="num '+(up?'up':'dn')+'">'+(up?'+':'−')+fmtUsd(Math.abs(w.pnl1d))+'</span>'+
+      '<span class="sp num">'+w.buy1d+'/'+w.sell1d+'</span>'+
+      '<span class="num sm">'+wr+'</span><span></span></div>';
+  }).join(''):'<div class="hint" style="padding:18px 0">正在抓取 GMGN 聪明钱榜…</div>');
+}
+function renderWallets(){
+  var list=(feedAll?events:events.filter(function(e){return e.src===sel;})).slice(0,12);
+  $('feed').innerHTML=list.length?list.map(function(e){
+    return '<li class="ev'+(e.fresh?' new':'')+'" style="--c:'+SRC[e.src].color+'"><time>'+hh(e.t)+'</time><span class="chip">'+e.kind+'</span><code>'+e.addr+'</code>'+
+      '<span class="what"><span class="'+(e.act==='buy'?'up':'dn')+'">'+(e.act==='buy'?'买入':'卖出')+'</span> <b style="color:'+SRC[e.src].color+'">'+e.sym+'</b> '+fmtUsd(e.usd)+'</span></li>';}).join('')
+    :'<li class="ev"><span class="hint">等待第一条钱包动态…</span></li>';
+}
+function tileHtml(c){var up=c.chg>=0;
+  return '<div class="tile"><div class="tt"><b>'+c.sym+'</b><span class="'+(up?'up':'dn')+'">'+(up?'▲':'▼')+Math.abs(c.chg).toFixed(1)+'%</span></div>'+
+    '<div class="px">'+fmtPrice(c.p)+'</div>'+spark(c.hist,120,28,up?COL.up:COL.down,true)+'</div>';}
+function renderCoins(){
+  $('mainCoins').innerHTML=COINS.filter(function(c){return c.g==='main';}).map(tileHtml).join('');
+  $('hotCoins').innerHTML=COINS.filter(function(c){return c.g==='hot';}).map(tileHtml).join('');
+}
+
+/* ---------- 数据节拍 ---------- */
+function tick(){
+  var now=Date.now();
+  pumpNewTs=pumpNewTs.filter(function(t){return now-t<60000;});
+  rate.pump.v=pumpNewTs.length;
+  rate.pump.h.push(rate.pump.v);rate.pump.h.shift();
+  renderTokens();
+  KEYS.forEach(function(k){tokens[k].forEach(function(t){t.fresh=false;});});
+  renderCoins();updateSourceCards();updateAgentCards();
+}
+function pushEvent(e){
+  e.t=e.t||Date.now();e.fresh=true;
+  events.unshift(e);if(events.length>60)events.pop();
+  stats.alerts++;
+  ping(e.src);
+  if(e.act==='buy')Sfx.buy();else Sfx.sell();
+  beams.push({src:e.src,life:1,color:e.act==='buy'?COL.up:COL.down,
+    text:(e.note?e.note+' ':((e.act==='buy'?'买入 ':'卖出 ')))+fmtUsd(e.usd)});
+  renderWallets();e.fresh=false;updateSourceCards();
+  if(Math.random()<.55)say(agent('WALLET'),(e.act==='buy'?'':'注意：')+e.kind+' '+(e.act==='buy'?'买入':'卖出')+' '+e.sym);
+}
+/* ---------- 画布：办公室 ---------- */
+var cv=$('office'),ctx=cv.getContext('2d');
+var W=1200,H=640,sc=1,T=0;
+function resize(){var w=cv.clientWidth||720,dpr=Math.min(2,window.devicePixelRatio||1);cv.width=Math.round(w*dpr);cv.height=Math.round(w*dpr*H/W);sc=cv.width/W;}
+if(window.ResizeObserver)new ResizeObserver(resize).observe(cv);window.addEventListener('resize',resize);resize();
+
+function rr(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+function fnt(size,weight){return (weight||400)+' '+size+'px "JetBrains Mono",ui-monospace,"PingFang SC","Microsoft YaHei",monospace';}
+function txt(s,x,y,o){o=o||{};ctx.font=fnt(o.size||11,o.weight||400);ctx.fillStyle=o.color||COL.fg;ctx.textAlign=o.align||'left';ctx.textBaseline='alphabetic';ctx.fillText(s,x,y);}
+
+var NEST={x:95,y:95},HUB={x:600,y:268},WALL_IN={x:600,y:198};
+var PORTS={
+  pump:{key:'pump',x:62,y:360,color:COL.pump,label:'PUMP'},
+  fomo:{key:'fomo',x:600,y:584,color:COL.fomo,label:'FOMO'},
+  gmgn:{key:'gmgn',x:1138,y:360,color:COL.gmgn,label:'GMGN'},
+  dex:{key:'dex',x:62,y:540,color:COL.muted,label:'DEX'},
+  cg:{key:'cg',x:1138,y:540,color:COL.muted,label:'CG'}
+};
+var dispatchQ=[];
+function choosePort(){
+  if(dispatchQ.length)return dispatchQ.shift();
+  var r=Math.random();
+  if(r<.55)return PORTS[sel];
+  if(r<.8)return PORTS[pick(KEYS.filter(function(k){return k!==sel;}))];
+  return pick([PORTS.dex,PORTS.cg]);
+}
+function ping(src){
+  blips.push({a:rnd(0,TAU),r:rnd(14,42),life:1});
+  if(dispatchQ.length<4)dispatchQ.push(PORTS[src]);
+}
+
+/* 蜘蛛 */
+var spiders=[],pulses=[],parts=[],blips=[],beams=[],marks=[],grads=[],fws=[],shocks=[];
+var RADAR={x:1105,y:100};
+function burstFW(){
+  var cols=['#ffd166','#ff5c7a','#7cf7c4','#7cc4ff','#e08fff'];
+  for(var i=0;i<46;i++){var a=Math.random()*TAU,sp=60+Math.random()*160;
+    fws.push({x:RADAR.x,y:RADAR.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-40,life:1,max:1,
+      color:cols[Math.floor(Math.random()*cols.length)]});}
+}
+function burstEX(){shocks.push({x:RADAR.x,y:RADAR.y,r:8,life:1,color:COL.down});}
+function drawFws(){
+  fws.forEach(function(p){
+    ctx.globalAlpha=clamp(p.life,0,1);ctx.fillStyle=p.color;
+    ctx.beginPath();ctx.arc(p.x,p.y,2.2,0,TAU);ctx.fill();ctx.globalAlpha=1;
+  });
+}
+function drawShocks(){
+  shocks.forEach(function(s){
+    ctx.strokeStyle=alpha(s.color,s.life);ctx.lineWidth=3;
+    ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,TAU);ctx.stroke();
+    ctx.strokeStyle=alpha('#ffffff',s.life*.5);ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.arc(s.x,s.y,s.r*.7,0,TAU);ctx.stroke();
+  });
+}
+function newSpider(i){return {i:i,x:NEST.x+rnd(-8,8),y:NEST.y+rnd(-8,8),state:'nest',wait:i*.8+.2,carry:null,trail:[],phase:rnd(0,6),ang:0,v:rnd(150,200),port:null,t:0,len:1,a:null,b:null,c:null};}
+for(var si=0;si<8;si++)spiders.push(newSpider(si));
+function leg(s,tx,ty){
+  s.a={x:s.x,y:s.y};s.b={x:tx,y:ty};
+  var dx=tx-s.x,dy=ty-s.y,L=Math.hypot(dx,dy)||1,nx=-dy/L,ny=dx/L,k=rnd(-.35,.35)*L;
+  s.c={x:(s.x+tx)/2+nx*k,y:(s.y+ty)/2+ny*k};s.t=0;s.len=L*1.1+20;
+}
+function bez(s,t){var u=1-t;return {x:u*u*s.a.x+2*u*t*s.c.x+t*t*s.b.x,y:u*u*s.a.y+2*u*t*s.c.y+t*t*s.b.y};}
+function bezD(s,t){var u=1-t;return {x:2*u*(s.c.x-s.a.x)+2*t*(s.b.x-s.c.x),y:2*u*(s.c.y-s.a.y)+2*t*(s.b.y-s.c.y)};}
+function moveSpider(s,dt,onEnd){
+  s.t=Math.min(1,s.t+s.v*dt/s.len);
+  var p=bez(s,s.t),d=bezD(s,s.t);s.x=p.x;s.y=p.y;s.ang=Math.atan2(d.y,d.x);s.phase+=dt*16;
+  if(s.t>=1)onEnd();
+}
+function deliver(s){
+  var c=s.carry||{color:COL.fg};
+  pulses.push({x:HUB.x,y:HUB.y,r:10,life:1,color:c.color});
+  for(var i=0;i<3;i++)parts.push({t:-i*.12,color:c.color});
+  stats.packets++;Sfx.deliver();
+}
+function updateSpider(s,dt){
+  s.trail.push({x:s.x,y:s.y});if(s.trail.length>30)s.trail.shift();
+  switch(s.state){
+    case 'nest':s.wait-=dt;s.phase+=dt*3;
+      if(s.wait<=0){s.port=choosePort();leg(s,s.port.x,s.port.y);s.state='toPort';}break;
+    case 'toPort':moveSpider(s,dt,function(){s.state='grab';s.wait=.5;s.fail=Math.random()<.12;s.carry=s.fail?null:s.port;});break;
+    case 'grab':s.wait-=dt;s.phase+=dt*8;
+      if(s.wait<=0){
+        if(s.fail){s.state='fail';s.wait=.6;stats.fails++;marks.push({x:s.x,y:s.y,life:1});Sfx.fail();say(agent('CRAWLER'),s.port.label+' 抓取失败，蜘蛛撤回');}
+        else{Sfx.grab();leg(s,HUB.x+rnd(-18,18),HUB.y+rnd(-14,14));s.state='toHub';}
+      }break;
+    case 'fail':s.wait-=dt;s.phase+=dt*20;
+      if(s.wait<=0){leg(s,NEST.x+rnd(-8,8),NEST.y+rnd(-8,8));s.state='toNest';}break;
+    case 'toNest':moveSpider(s,dt,function(){s.state='nest';s.wait=rnd(1,2.5);s.fail=false;});break;
+    case 'toHub':moveSpider(s,dt,function(){s.state='drop';s.wait=.35;deliver(s);});break;
+    case 'drop':s.wait-=dt;
+      if(s.wait<=0){s.carry=null;s.port=choosePort();leg(s,s.port.x,s.port.y);s.state='toPort';}break;
+  }
+}
+function drawSpider(s){
+  var col=s.fail?COL.down:(s.carry?s.carry.color:COL.fg),n=s.trail.length;
+  ctx.lineWidth=1.2;
+  for(var i=1;i<n;i++){ctx.strokeStyle=alpha(col,i/n*.4);ctx.beginPath();ctx.moveTo(s.trail[i-1].x,s.trail[i-1].y);ctx.lineTo(s.trail[i].x,s.trail[i].y);ctx.stroke();}
+  var moving=s.state==='toPort'||s.state==='toHub'||s.state==='toNest'||s.state==='fail';
+  ctx.save();ctx.translate(s.x,s.y);ctx.rotate(s.ang);ctx.scale(1.25,1.25);
+  ctx.strokeStyle=alpha(col,.9);ctx.lineWidth=1;ctx.lineJoin='round';
+  for(var side=-1;side<=1;side+=2){
+    for(var j=0;j<4;j++){
+      var ax=-3+j*2.6,sw=Math.sin(s.phase+j*1.6+(side>0?Math.PI:0))*(moving?4.5:1.2);
+      ctx.beginPath();ctx.moveTo(ax,side*2.5);ctx.lineTo(ax+(j-1.5)*3+sw*.5,side*8.5);ctx.lineTo(ax+(j-1.5)*6+sw,side*13);ctx.stroke();
+    }
+  }
+  ctx.fillStyle=COL.panel2;ctx.strokeStyle=col;
+  ctx.beginPath();ctx.ellipse(-4,0,6,4.5,0,0,TAU);ctx.fill();ctx.stroke();
+  ctx.beginPath();ctx.arc(4,0,3.2,0,TAU);ctx.fill();ctx.stroke();
+  ctx.fillStyle=COL.down;ctx.fillRect(5.5,-2,1.2,1.2);ctx.fillRect(5.5,.8,1.2,1.2);
+  if(s.carry){ctx.shadowColor=col;ctx.shadowBlur=10*sc;ctx.fillStyle=col;ctx.beginPath();ctx.arc(-4,0,2.8,0,TAU);ctx.fill();ctx.shadowBlur=0;}
+  ctx.restore();
+}
+
+/* 智能体 */
+var agents=AG.map(function(a){return {k:a.k,color:a.color,home:a.home,x:a.home.x,y:a.home.y,tx:a.home.x,ty:a.home.y,wait:rnd(1,4),nextSay:rnd(1,6),log:[],bubble:null,face:1,moving:false,phase:rnd(0,6)};});
+function agent(k){return agents.filter(function(a){return a.k===k;})[0];}
+var WPS=[{x:540,y:268},{x:660,y:268},{x:600,y:335},{x:480,y:226},{x:720,y:226},{x:1060,y:175},{x:175,y:190},{x:110,y:360},{x:1090,y:360},{x:420,y:420},{x:780,y:420}];
+function pickTarget(a){
+  var r=Math.random(),p;
+  if(r<.42)p=a.home;
+  else if(r<.68)p=SRC[sel].seat;
+  else p=pick(WPS);
+  a.tx=p.x+rnd(-18,18);a.ty=p.y+rnd(-10,10);
+}
+function sayFor(k){
+  var s=SRC[sel],list=tokens[sel],t=pick(list)||{sym:'—'};
+  var m={
+    CHIEF:[s.name+' 候选 '+list.filter(function(x){return x.safe>=70;}).length+' 个',t.sym+' 进入观察名单','等回踩再动手'],
+    SCAN:[s.name+' 新池 '+t.sym,t.sym+' 买单加速','扫到 '+Math.floor(rnd(3,18))+' 个新币'],
+    VET:[t.sym+' 持仓集中度 '+Math.floor(rnd(8,40))+'%',t.sym+' 合约检查通过',t.sym+' 疑似貔貅，淘汰'],
+    WALLET:['聪明钱买入 '+t.sym,'狙击手清仓 '+t.sym,'巨鲸 '+b58(4)+'… 加仓'],
+    QUANT:[t.sym+' 动量 '+rnd(.4,.95).toFixed(2),'波动偏大，降权','量价背离'],
+    SIZE:['单笔上限 '+fmtUsd(rnd(300,3000)),t.sym+' 仓位减半','保持小额试探'],
+    RISK:['止损 -'+Math.floor(rnd(8,20))+'%',t.sym+' 流动性偏薄','今日回撤在限内'],
+    CRAWLER:['蜘蛛已出动 '+spiders.filter(function(x){return x.state!=='nest';}).length+' 只','抓取 '+s.name+' 榜单','数据包送达 hub'],
+    BTCW:['BTC 大买 '+WHALE.BTC.buys+' / 大卖 '+WHALE.BTC.sells,'BTC 最大单 '+fmtUsd(WHALE.BTC.max),'BTC 盘口扫描中'],
+    ETHW:['ETH 大买 '+WHALE.ETH.buys+' / 大卖 '+WHALE.ETH.sells,'ETH 最大单 '+fmtUsd(WHALE.ETH.max),'ETH 盘口扫描中']
+  }[k];
+  return pick(m);
+}
+var logOpen=null;
+function say(a,text){if(!a)return;var tx=text||sayFor(a.k);a.bubble={text:tx,life:3.2,max:3.2};a.log.unshift({t:Date.now(),text:tx});if(a.log.length>20)a.log.pop();flashCard(a.k);Sfx.talk();if(logOpen===a.k)renderLog();}
+function updateAgent(a,dt){
+  var dx=a.tx-a.x,dy=a.ty-a.y,d=Math.hypot(dx,dy);
+  if(d>2){var sp=Math.min(d,75*dt);a.x+=dx/d*sp;a.y+=dy/d*sp;a.moving=true;if(Math.abs(dx)>1)a.face=dx>0?1:-1;}
+  else{a.moving=false;a.wait-=dt;if(a.wait<=0){pickTarget(a);a.wait=rnd(2.5,6.5);}}
+  if(a.bubble){a.bubble.life-=dt;if(a.bubble.life<=0)a.bubble=null;}
+  else{a.nextSay-=dt;if(a.nextSay<=0){say(a);a.nextSay=rnd(4,9);}}
+}
+function drawAgent(a){
+  var bob=a.moving?Math.sin(T*10+a.phase)*2:Math.sin(T*2+a.phase)*1.5;
+  ctx.fillStyle='rgba(0,0,0,.4)';ctx.beginPath();ctx.ellipse(a.x,a.y+17,13,4,0,0,TAU);ctx.fill();
+  if(a.bubble){ctx.shadowColor=a.color;ctx.shadowBlur=14*sc;}
+  ctx.fillStyle=a.color;ctx.beginPath();ctx.arc(a.x,a.y+bob,15,0,TAU);ctx.fill();ctx.shadowBlur=0;
+  ctx.fillStyle=COL.bg;rr(a.x-10,a.y+bob-6,20,10,4);ctx.fill();
+  ctx.fillStyle=COL.fg;ctx.beginPath();ctx.arc(a.x-4+a.face*1.5,a.y+bob-1,1.9,0,TAU);ctx.fill();
+  ctx.beginPath();ctx.arc(a.x+4+a.face*1.5,a.y+bob-1,1.9,0,TAU);ctx.fill();
+  txt(a.k,a.x,a.y+33,{size:10,align:'center',color:COL.muted,weight:600});
+  if(a.k===logOpen){ctx.strokeStyle=a.color;ctx.lineWidth=2;ctx.beginPath();ctx.arc(a.x,a.y+bob,21,0,TAU);ctx.stroke();}
+}
+function drawBubble(a){
+  if(!a.bubble)return;var b=a.bubble;
+  var al=clamp(Math.min(b.life/.5,(b.max-b.life)/.2),0,1);
+  ctx.globalAlpha=al;ctx.font=fnt(11,400);
+  var w=ctx.measureText(b.text).width+16,bx=clamp(a.x-w/2,6,W-w-6),by=a.y-58;
+  ctx.fillStyle=COL.panel2;rr(bx,by,w,22,6);ctx.fill();ctx.strokeStyle=alpha(a.color,.85);ctx.lineWidth=1;ctx.stroke();
+  ctx.beginPath();ctx.moveTo(a.x-4,by+22);ctx.lineTo(a.x,by+28);ctx.lineTo(a.x+4,by+22);ctx.fillStyle=COL.panel2;ctx.fill();
+  txt(b.text,bx+8,by+15,{size:11});ctx.globalAlpha=1;
+}
+
+/* 场景元素 */
+var candles=[],cprice=100,candleT=0;
+function pushCandle(){var o=cprice,c=o*(1+rnd(-.03,.035)),h=Math.max(o,c)*(1+rnd(0,.015)),l=Math.min(o,c)*(1-rnd(0,.015));cprice=c;candles.push({o:o,h:h,l:l,c:c});if(candles.length>44)candles.shift();}
+for(var ci=0;ci<44;ci++)pushCandle();
+
+function drawFloor(){
+  ctx.fillStyle=COL.bg;ctx.fillRect(0,0,W,H);
+  var g=ctx.createRadialGradient(600,300,60,600,300,700);g.addColorStop(0,alpha(COL.panel2,.9));g.addColorStop(1,alpha(COL.bg,0));
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle=alpha(COL.line,.55);ctx.lineWidth=1;
+  for(var x=0;x<=W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(var y=0;y<=H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  ctx.strokeStyle=COL.line;ctx.lineWidth=2;rr(6,6,W-12,H-12,14);ctx.stroke();
+}
+function drawNest(){
+  ctx.strokeStyle=alpha(COL.fg,.16);ctx.lineWidth=1;
+  for(var i=0;i<8;i++){var a=i*Math.PI/4;ctx.beginPath();ctx.moveTo(NEST.x,NEST.y);ctx.lineTo(NEST.x+Math.cos(a)*66,NEST.y+Math.sin(a)*66);ctx.stroke();}
+  for(var r=1;r<=4;r++){ctx.beginPath();for(var j=0;j<=8;j++){var an=j*Math.PI/4,rr2=r*16-(j%2?3:0);var px=NEST.x+Math.cos(an)*rr2,py=NEST.y+Math.sin(an)*rr2;if(j)ctx.lineTo(px,py);else ctx.moveTo(px,py);}ctx.stroke();}
+  txt('CRAWLER NEST',NEST.x,NEST.y+88,{size:10,align:'center',color:COL.muted,weight:600});
+}
+function drawRadar(){
+  var x=1105,y=100;
+  ctx.strokeStyle=alpha(COL.up,.25);ctx.lineWidth=1;
+  [14,28,44].forEach(function(r){ctx.beginPath();ctx.arc(x,y,r,0,TAU);ctx.stroke();});
+  var a=T*1.6;ctx.fillStyle=alpha(COL.up,.16);ctx.beginPath();ctx.moveTo(x,y);ctx.arc(x,y,44,a-.5,a);ctx.closePath();ctx.fill();
+  ctx.strokeStyle=alpha(COL.up,.8);ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+Math.cos(a)*44,y+Math.sin(a)*44);ctx.stroke();
+  blips.forEach(function(b){ctx.fillStyle=alpha(COL.warn,b.life);ctx.beginPath();ctx.arc(x+Math.cos(b.a)*b.r,y+Math.sin(b.a)*b.r,3,0,TAU);ctx.fill();});
+  txt('WHALE RADAR',x,y+70,{size:10,align:'center',color:COL.muted,weight:600});
+}
+function drawWall(){
+  var x=330,y=26,w=540,h=170,s=SRC[sel];
+  ctx.fillStyle=COL.panel;rr(x,y,w,h,10);ctx.fill();
+  ctx.strokeStyle=alpha(s.color,.75);ctx.lineWidth=1.5;ctx.stroke();
+  txt('MARKET WALL · '+s.name,x+14,y+22,{size:12,color:COL.muted,weight:600});
+  var chips=['NEW '+Math.round(rate[sel].v)+'/m','TRACK '+tokens[sel].length,'ALERT '+stats.alerts],cx=x+w-14;
+  for(var i=chips.length-1;i>=0;i--){ctx.font=fnt(11,600);var tw=ctx.measureText(chips[i]).width;txt(chips[i],cx,y+22,{align:'right',size:11,weight:600,color:i===0?s.color:COL.fg});cx-=tw+16;}
+  var cx0=x+14,cy0=y+40,cw=w-28,ch=h-56,n=candles.length,mn=1e9,mx=0;
+  candles.forEach(function(c){mn=Math.min(mn,c.l);mx=Math.max(mx,c.h);});
+  function ys(v){return cy0+ch-(v-mn)/(mx-mn||1)*ch;}
+  ctx.strokeStyle=alpha(COL.line,.9);ctx.lineWidth=1;
+  for(var g=0;g<=3;g++){var gy=cy0+g*ch/3;ctx.beginPath();ctx.moveTo(cx0,gy);ctx.lineTo(cx0+cw,gy);ctx.stroke();}
+  candles.forEach(function(c,k){
+    var px=cx0+(k+.5)*cw/n,col=c.c>=c.o?COL.up:COL.down,bw=Math.max(2,cw/n*.6);
+    ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(px,ys(c.h));ctx.lineTo(px,ys(c.l));ctx.stroke();
+    var y1=ys(Math.max(c.o,c.c)),y2=ys(Math.min(c.o,c.c));ctx.fillRect(px-bw/2,y1,bw,Math.max(1.5,y2-y1));
+  });
+  var ly=ys(candles[n-1].c);ctx.strokeStyle=alpha(s.color,.7);ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(cx0,ly);ctx.lineTo(cx0+cw,ly);ctx.stroke();ctx.setLineDash([]);
+  ctx.strokeStyle=COL.line;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(WALL_IN.x-14,y+h);ctx.lineTo(WALL_IN.x+14,y+h);ctx.stroke();
+}
+function drawLinks(){
+  ctx.lineWidth=1;ctx.setLineDash([3,7]);
+  Object.keys(PORTS).forEach(function(k){var p=PORTS[k],on=k===sel;
+    ctx.strokeStyle=alpha(p.color,on?.4:.1);ctx.lineDashOffset=-T*(on?30:10);
+    ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(HUB.x,HUB.y);ctx.stroke();});
+  ctx.setLineDash([]);ctx.lineDashOffset=0;
+}
+function drawPort(p){
+  var on=p.key===sel;
+  ctx.beginPath();for(var i=0;i<6;i++){var a=i*Math.PI/3+Math.PI/6;var px=p.x+Math.cos(a)*16,py=p.y+Math.sin(a)*16;if(i)ctx.lineTo(px,py);else ctx.moveTo(px,py);}ctx.closePath();
+  ctx.fillStyle=COL.panel2;ctx.fill();ctx.strokeStyle=alpha(p.color,on?1:.55);ctx.lineWidth=on?2.5:1.5;
+  if(on){ctx.shadowColor=p.color;ctx.shadowBlur=14*sc;}ctx.stroke();ctx.shadowBlur=0;
+  txt(p.label,p.x,p.y-24,{size:10,align:'center',color:on?p.color:COL.muted,weight:700});
+}
+function drawHub(){
+  var s=SRC[sel];
+  [22,34,46].forEach(function(r,i){ctx.setLineDash([4,6]);ctx.lineDashOffset=-T*22*(i%2?1:-1);ctx.strokeStyle=alpha(s.color,.28+.14*Math.sin(T*2+i));ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(HUB.x,HUB.y,r,0,TAU);ctx.stroke();});
+  ctx.setLineDash([]);ctx.lineDashOffset=0;
+  ctx.fillStyle=COL.panel2;ctx.beginPath();ctx.arc(HUB.x,HUB.y,15,0,TAU);ctx.fill();ctx.strokeStyle=alpha(s.color,.9);ctx.lineWidth=1.5;ctx.stroke();
+  txt('HUB',HUB.x,HUB.y+3.5,{size:9,align:'center',weight:700,color:s.color});
+  pulses.forEach(function(p){ctx.strokeStyle=alpha(p.color,p.life*.8);ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,TAU);ctx.stroke();});
+  parts.forEach(function(p){if(p.t<=0)return;var e=1-Math.pow(1-p.t,2),x=HUB.x+(WALL_IN.x-HUB.x)*e,y=HUB.y-16+(WALL_IN.y-HUB.y+16)*e;
+    ctx.shadowColor=p.color;ctx.shadowBlur=10*sc;ctx.fillStyle=p.color;ctx.fillRect(x-2.5,y-2.5,5,5);ctx.shadowBlur=0;});
+}
+function drawDesk(k){
+  var s=SRC[k],x=s.desk.x,y=s.desk.y,on=sel===k;
+  if(on){var g=ctx.createRadialGradient(x,y+10,10,x,y+10,190);g.addColorStop(0,alpha(s.color,.17));g.addColorStop(1,alpha(s.color,0));ctx.fillStyle=g;ctx.fillRect(x-200,y-130,400,360);}
+  ctx.fillStyle=COL.panel2;rr(x-88,y-6,176,46,8);ctx.fill();ctx.strokeStyle=COL.line;ctx.lineWidth=1;ctx.stroke();
+  ctx.fillStyle=COL.bg;rr(x-70,y-66,140,56,6);ctx.fill();
+  ctx.strokeStyle=alpha(s.color,on?1:.4);ctx.lineWidth=on?2:1;
+  if(on){ctx.shadowColor=s.color;ctx.shadowBlur=14*sc;}ctx.stroke();ctx.shadowBlur=0;
+  for(var i=0;i<16;i++){var hgt=6+(Math.sin(T*2+i*.7+k.length)*.5+.5)*30;ctx.fillStyle=alpha(s.color,on?.85:.4);ctx.fillRect(x-62+i*8.2,y-14-hgt,5.5,hgt);}
+  ctx.strokeStyle=COL.line;rr(x-30,y+10,60,12,3);ctx.stroke();
+  txt(s.name,x,y-76,{size:12,align:'center',weight:700,color:on?s.color:COL.muted});
+  txt(s.zh,x,y+58,{size:10,align:'center',color:COL.muted});
+}
+function drawStations(){
+  agents.forEach(function(a){ctx.strokeStyle=alpha(a.color,.28);ctx.lineWidth=1.2;ctx.beginPath();ctx.ellipse(a.home.x,a.home.y+14,26,9,0,0,TAU);ctx.stroke();});
+}
+var ledW=0;
+function drawLed(){
+  ctx.save();ctx.beginPath();ctx.rect(0,612,W,28);ctx.clip();
+  ctx.fillStyle=COL.panel;ctx.fillRect(0,612,W,28);ctx.fillStyle=COL.line;ctx.fillRect(0,612,W,1);
+  ctx.font=fnt(12,600);ctx.textAlign='left';ctx.textBaseline='middle';
+  var gap=34,total=0;
+  var items=COINS.map(function(c){var a=c.sym+' '+fmtPrice(c.p)+' ',b=(c.chg>=0?'▲':'▼')+Math.abs(c.chg).toFixed(1)+'%',wa=ctx.measureText(a).width,wb=ctx.measureText(b).width;total+=wa+wb+gap;return {a:a,b:b,wa:wa,wb:wb,up:c.chg>=0};});
+  ledW=total;var x=-((T*45)%(ledW||1));
+  for(var rep=0;rep<4&&x<W;rep++){items.forEach(function(it){ctx.fillStyle=COL.fg;ctx.fillText(it.a,x,627);ctx.fillStyle=it.up?COL.up:COL.down;ctx.fillText(it.b,x+it.wa,627);x+=it.wa+it.wb+gap;});}
+  ctx.restore();
+}
+
+/* 主循环 */
+function update(dt){
+  agents.forEach(function(a){updateAgent(a,dt);});
+  spiders.forEach(function(s){updateSpider(s,dt);});
+  pulses.forEach(function(p){p.life-=dt*1.2;p.r+=dt*70;});pulses=pulses.filter(function(p){return p.life>0;});
+  parts.forEach(function(p){p.t+=dt*1.4;});parts=parts.filter(function(p){return p.t<1;});
+  blips.forEach(function(b){b.life-=dt*.5;});blips=blips.filter(function(b){return b.life>0;});
+  beams.forEach(function(b){b.life-=dt*.6;});beams=beams.filter(function(b){return b.life>0;});
+  marks.forEach(function(m){m.life-=dt*1.1;});marks=marks.filter(function(m){return m.life>0;});
+  grads.forEach(function(g){g.t+=dt*.45;if(g.t>=1&&!g.done){g.done=true;pulses.push({x:PORTS.dex.x,y:PORTS.dex.y,r:10,life:1,color:COL.pump});}});
+  grads=grads.filter(function(g){return g.t<1.05;});
+  fws.forEach(function(p){p.life-=dt*.9;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=160*dt;});
+  fws=fws.filter(function(p){return p.life>0;});
+  shocks.forEach(function(s){s.life-=dt*1.4;s.r+=dt*260;});
+  shocks=shocks.filter(function(s){return s.life>0;});
+  candleT+=dt;if(candleT>.9){candleT=0;pushCandle();}
+}
+function draw(){
+  ctx.setTransform(sc,0,0,sc,0,0);
+  drawFloor();drawNest();drawRadar();drawLinks();drawWall();
+  KEYS.forEach(drawDesk);drawStations();
+  Object.keys(PORTS).forEach(function(k){drawPort(PORTS[k]);});
+  drawHub();drawMarks();drawGrads();
+  agents.slice().sort(function(a,b){return a.y-b.y;}).forEach(drawAgent);
+  spiders.forEach(drawSpider);
+  drawBeams();drawFws();drawShocks();
+  agents.forEach(drawBubble);
+  drawLed();
+}
+var last=performance.now();
+function frame(now){
+  var dt=Math.min(.05,(now-last)/1000)*SPEED;last=now;T+=dt;
+  update(dt);draw();requestAnimationFrame(frame);
+}
+
+/* ---------- 交互 ---------- */
+function select(k){
+  if(k===sel)return;sel=k;
+  document.querySelectorAll('.src').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.src===k));});
+  renderTokens();renderWallets();updateAgentCards();
+  if(k==='fomo')fomoPoll();
+  if(k==='gmgn')gmgnPoll();
+  dispatchQ.push(PORTS[k],PORTS[k],PORTS[k]);
+  say(agent('SCAN'),'切到 '+SRC[k].name+'，派蜘蛛');
+}
+$('sources').addEventListener('click',function(e){var b=e.target.closest('.src');if(b)select(b.dataset.src);});
+$('tokBody').addEventListener('click',function(e){
+  var r=e.target.closest('[data-id]');if(!r)return;
+  var t=tokens[sel].filter(function(x){return String(x.id)===r.dataset.id;})[0];if(!t)return;
+  dispatchQ.push(PORTS[t.src],PORTS[t.src]);say(agent('VET'),'审查 '+t.sym);
+});
+$('feedToggle').addEventListener('click',function(){
+  feedAll=!feedAll;this.setAttribute('aria-pressed',String(feedAll));this.textContent=feedAll?'全部来源':'只看当前来源';renderWallets();
+});
+$('sndbtn').addEventListener('click',function(){
+  Sfx.on=!Sfx.on;Sfx.resume();
+  this.setAttribute('aria-pressed',String(Sfx.on));
+  $('sndtxt').textContent=Sfx.on?'音效开':'音效关';
+  var wv=this.querySelectorAll('.wv');for(var i=0;i<wv.length;i++)wv[i].style.display=Sfx.on?'':'none';
+  if(Sfx.on)Sfx.deliver();
+});
+
+/* 失败标记、钱包光束、毕业币 */
+function graduate(t){
+  grads.push({sym:t.sym,t:0});Sfx.grad();
+  say(agent('CHIEF'),t.sym+' 毕业，转二级');
+}
+function drawMarks(){
+  marks.forEach(function(m){
+    ctx.strokeStyle=alpha(COL.down,m.life);ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(m.x-7,m.y-7);ctx.lineTo(m.x+7,m.y+7);ctx.moveTo(m.x+7,m.y-7);ctx.lineTo(m.x-7,m.y+7);ctx.stroke();
+    ctx.beginPath();ctx.arc(m.x,m.y,8+(1-m.life)*14,0,TAU);ctx.stroke();
+  });
+}
+function drawBeams(){
+  var x0=1105,y0=100;
+  beams.forEach(function(b){
+    var d=SRC[b.src].desk,x1=d.x,y1=d.y-70,h=clamp((1-b.life)*2.5,0,1),x=x0+(x1-x0)*h,y=y0+(y1-y0)*h;
+    ctx.strokeStyle=alpha(b.color,b.life*.8);ctx.lineWidth=1.5;ctx.setLineDash([6,5]);
+    ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x,y);ctx.stroke();ctx.setLineDash([]);
+    ctx.shadowColor=b.color;ctx.shadowBlur=12*sc;ctx.fillStyle=b.color;ctx.beginPath();ctx.arc(x,y,4,0,TAU);ctx.fill();ctx.shadowBlur=0;
+    if(h>=1){
+      ctx.strokeStyle=alpha(b.color,b.life);ctx.lineWidth=2;ctx.beginPath();ctx.arc(x1,y1,10+(1-b.life)*18,0,TAU);ctx.stroke();
+      ctx.globalAlpha=clamp(b.life*1.5,0,1);txt(b.text,x1,y1-14-(1-b.life)*10,{size:11,align:'center',weight:700,color:b.color});ctx.globalAlpha=1;
+    }
+  });
+}
+function drawGrads(){
+  var a0={x:250,y:334},c={x:130,y:360},a1={x:PORTS.dex.x,y:PORTS.dex.y};
+  grads.forEach(function(g){
+    var t=clamp(g.t,0,1),u=1-t,x=u*u*a0.x+2*u*t*c.x+t*t*a1.x,y=u*u*a0.y+2*u*t*c.y+t*t*a1.y;
+    ctx.shadowColor=COL.pump;ctx.shadowBlur=14*sc;ctx.fillStyle=COL.pump;ctx.beginPath();ctx.arc(x,y,9,0,TAU);ctx.fill();ctx.shadowBlur=0;
+    txt('P',x,y+3.5,{size:10,align:'center',weight:700,color:COL.bg});
+    txt(g.sym+' 毕业 → 二级',x+14,y-8,{size:11,weight:700,color:COL.pump});
+  });
+}
+
+/* 智能体决策日志 */
+function renderLog(){
+  var el=$('logp');
+  if(!logOpen){el.hidden=true;return;}
+  var a=agent(logOpen),meta=AG.filter(function(x){return x.k===logOpen;})[0];
+  el.hidden=false;el.style.setProperty('--c',a.color);
+  el.innerHTML='<h3><span style="color:'+a.color+'">'+a.k+' · '+meta.zh+' 决策日志</span><button class="x" id="logx" aria-label="关闭日志">×</button></h3><ol>'+
+    (a.log.length?a.log.map(function(l){return '<li><time>'+hh(l.t)+'</time><span>'+l.text+'</span></li>';}).join(''):'<li><span class="hint">还没有记录，等它说话</span></li>')+'</ol>';
+}
+function openLog(k){logOpen=(logOpen===k)?null:k;renderLog();}
+function hitAgent(e){
+  var r=cv.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*W,y=(e.clientY-r.top)/r.height*H,best=null,bd=26;
+  agents.forEach(function(a){var d=Math.hypot(a.x-x,a.y-y);if(d<bd){bd=d;best=a;}});
+  return best;
+}
+cv.addEventListener('click',function(e){var a=hitAgent(e);if(a)openLog(a.k);});
+cv.addEventListener('mousemove',function(e){cv.style.cursor=hitAgent(e)?'pointer':'default';});
+$('logp').addEventListener('click',function(e){if(e.target.closest('#logx')){logOpen=null;renderLog();}});
+document.querySelectorAll('.ag').forEach(function(el){
+  el.tabIndex=0;el.setAttribute('role','button');
+  el.addEventListener('click',function(){openLog(el.id.slice(3));});
+  el.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();openLog(el.id.slice(3));}});
+});
+
+/* 给接入真实数据用的入口 */
+window.OfficeFeed={
+  useSimulation:function(on){/* 本版恒为实时数据，模拟已移除 */},
+  addToken:function(src,o){
+    if(src==='pump'&&o.mint){pumpNewToken({symbol:o.sym,mint:o.mint,marketCapSol:(o.mcap||0)/(SOL_USD||108),vSolInBondingCurve:(o.bond||0)/100*85,signature:'',traderPublicKey:''});return;}
+    var t={id:++uid,sym:String(o.sym||'???').slice(0,10),src:src,mint:o.mint||'',born:Date.now(),mcap:o.mcap||0,hist:[],liq:null,bond:o.bond||0,fresh:true,chain:''};
+    for(var i=0;i<32;i++)t.hist.push(t.mcap);
+    tokens[src].unshift(t);if(tokens[src].length>12)tokens[src].pop();
+    ping(src);if(src===sel){renderTokens();t.fresh=false;}},
+  addWallet:function(e){pushEvent(e);},
+  setPrice:function(sym,p){COINS.forEach(function(c){if(c.sym===sym){c.p=p;c.hist.push(p);if(c.hist.length>48)c.hist.shift();}});}
+};
+
+/* ---------- 启动：全部接真实数据源 ---------- */
+renderTokens();renderWallets();renderCoins();updateSourceCards();updateAgentCards();
+PumpWS.connect();
+WhaleWS.connect();
+cgPoll();fomoPoll();gmgnPoll();
+setInterval(tick,2000);
+setInterval(dexPollTokens,30000);
+setInterval(fomoPoll,60000);
+setInterval(gmgnPoll,120000);
+setInterval(cgPoll,60000);
+setInterval(function(){var d=new Date();$('clock').textContent=hh(d.getTime())+' UTC';},1000);
+$('clock').textContent=hh(Date.now())+' UTC';
+requestAnimationFrame(frame);
+})();
+</script>
